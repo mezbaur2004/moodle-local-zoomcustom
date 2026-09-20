@@ -101,9 +101,7 @@ class guard {
             return $result;
         }
 
-        // Enforcement is on unless an administrator explicitly turned it off.
-        $enabled = get_config('local_zoomcustom', 'guardenabled');
-        if ($enabled === false || (string) $enabled === '1') {
+        if (self::enforcement_enabled()) {
             $result->enforced = true;
             if ($result->safe) {
                 self::resume($result);
@@ -119,6 +117,19 @@ class guard {
     }
 
     /**
+     * Whether the administrator has left the protection switched on.
+     *
+     * The setting is opt-out: an unset value means enabled, so a site that has
+     * never visited the settings page is still protected.
+     *
+     * @return bool
+     */
+    public static function enforcement_enabled(): bool {
+        $enabled = get_config('local_zoomcustom', 'guardenabled');
+        return $enabled === false || (string) $enabled === '1';
+    }
+
+    /**
      * Read only check used by the console guard and by the status card.
      *
      * @return bool
@@ -130,10 +141,18 @@ class guard {
     /**
      * Throw unless Zoom grading may run.
      *
+     * Honours the guardenabled setting: when an administrator has switched the
+     * protection off, this must not keep blocking, or the setting would only
+     * half work and the task would resume while the page path stayed barred.
+     *
      * @return void
      * @throws \moodle_exception
      */
     public static function require_safe(): void {
+        if (!self::enforcement_enabled()) {
+            return;
+        }
+
         $result = self::evaluate(false);
         if ($result->safe) {
             return;
@@ -141,6 +160,60 @@ class guard {
 
         throw new \moodle_exception('guardblocked', 'local_zoomcustom',
                 new \moodle_url('/local/patchmanager/index.php'), $result->reason);
+    }
+
+    /**
+     * Block the upstream report page when it is reached directly.
+     *
+     * mod_zoom's console/get_meeting_report.php constructs the report task and
+     * runs it inline, so a disabled scheduled task does not stop it. Patch 001
+     * inserts a guard there, but when the patch is absent, outdated or in
+     * conflict that inserted guard is absent too. This runs from a plugin
+     * callback instead, so it does not depend on the patch being present.
+     *
+     * @return void
+     * @throws \moodle_exception
+     */
+    public static function protect_current_request(): void {
+        if (!self::is_zoom_report_console()) {
+            return;
+        }
+
+        self::require_safe();
+    }
+
+    /**
+     * Is the running script mod_zoom's inline report console?
+     *
+     * @return bool
+     */
+    protected static function is_zoom_report_console(): bool {
+        global $CFG, $SCRIPT;
+
+        $target = '/mod/zoom/console/get_meeting_report.php';
+
+        if (is_string($SCRIPT) && $SCRIPT !== '') {
+            $script = str_replace('\\', '/', $SCRIPT);
+            if (substr($script, -strlen($target)) === $target) {
+                return true;
+            }
+        }
+
+        // $SCRIPT is derived from the request URL, so fall back to the file
+        // actually being executed.
+        $filename = $_SERVER['SCRIPT_FILENAME'] ?? '';
+        if (!is_string($filename) || $filename === '') {
+            return false;
+        }
+
+        $real = realpath($filename);
+        if ($real === false) {
+            return false;
+        }
+
+        $expected = realpath(rtrim(str_replace('\\', '/', $CFG->dirroot), '/') . $target);
+
+        return $expected !== false && $real === $expected;
     }
 
     /**
@@ -205,8 +278,7 @@ class guard {
             return;
         }
 
-        $task->set_disabled(true);
-        \core\task\manager::configure_scheduled_task($task);
+        self::set_task_disabled($task, true);
         set_config('taskpausedbyus', 1, 'local_zoomcustom');
 
         $result->taskpaused = true;
@@ -226,8 +298,7 @@ class guard {
 
         $task = self::get_task();
         if ($task !== null && $task->get_disabled()) {
-            $task->set_disabled(false);
-            \core\task\manager::configure_scheduled_task($task);
+            self::set_task_disabled($task, false);
         }
 
         unset_config('taskpausedbyus', 'local_zoomcustom');
@@ -267,6 +338,33 @@ class guard {
             $open->timeend = time();
             $DB->update_record('local_zoomcustom_guard', $open);
         }
+    }
+
+    /**
+     * Change the disabled flag of a scheduled task so the change survives an upgrade.
+     *
+     * disable() and enable() also mark the task as customised, which is what
+     * stops a later Moodle upgrade from resetting it to the defaults shipped in
+     * db/tasks.php and silently starting Zoom grading again. Writing
+     * set_disabled() alone would leave the task looking uncustomised.
+     *
+     * @param \core\task\scheduled_task $task
+     * @param bool $disabled
+     * @return void
+     */
+    protected static function set_task_disabled(\core\task\scheduled_task $task, bool $disabled): void {
+        $method = $disabled ? 'disable' : 'enable';
+        if (method_exists($task, $method)) {
+            $task->$method();
+            return;
+        }
+
+        // Older Moodle without disable()/enable().
+        $task->set_disabled($disabled);
+        if (method_exists($task, 'set_customised')) {
+            $task->set_customised(true);
+        }
+        \core\task\manager::configure_scheduled_task($task);
     }
 
     /**

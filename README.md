@@ -12,11 +12,12 @@ local/patchmanager/                     generic engine, knows nothing about Zoom
 ├── version.php
 ├── settings.php                        admin page under Plugins → Local plugins
 ├── index.php                           status list, review, confirm screens
-├── lib.php                             status_checks + pre_uninstall_hook
+├── lib.php                             status_checks
 ├── db/
 │   ├── access.php                      local/patchmanager:view, :manage
 │   ├── install.xml                     4 audit/history tables
-│   └── tasks.php                       check_state, every 30 min
+│   ├── tasks.php                       check_state, every 30 min
+│   └── uninstall.php                   refuses uninstall while patches are live
 ├── classes/
 │   ├── api.php                         the only entry point (UI, CLI, task, packs)
 │   ├── state.php                        6 states + aggregation rules
@@ -43,10 +44,12 @@ local/patchmanager/                     generic engine, knows nothing about Zoom
 local/zoomcustom/                       Zoom pack: all Zoom knowledge lives here
 ├── version.php                         depends on local_patchmanager + mod_zoom
 ├── settings.php                        guard on/off, strictness
-├── lib.php                             patches, state_changed, pre_uninstall_hook
+├── lib.php                             patches, state_changed, after_require_login
 ├── db/
 │   ├── install.xml                     local_zoomcustom_guard (unsafe windows)
-│   └── tasks.php                       guard_check, every 15 min
+│   ├── tasks.php                       guard_check, every 15 min
+│   ├── install.php                     evaluates the guard at install time
+│   └── uninstall.php                   restores stock mod_zoom, releases the task
 ├── classes/
 │   ├── patches.php                     001-period-grading definition (the 2 hunks)
 │   ├── hook.php                        what the patched mod_zoom calls
@@ -87,7 +90,9 @@ php local/patchmanager/cli/status.php
 ```
 
 Expected on a fresh install: `local_zoomcustom:001-period-grading  not_applied  unverified  [required]`.
-The guard will already have paused `\mod_zoom\task\get_meeting_reports`, which is deliberate.
+The guard will already have paused `\mod_zoom\task\get_meeting_reports`, which is deliberate. `db/install.php`
+evaluates the guard during installation, so the pause is in place immediately rather than waiting for the
+first scheduled `guard_check`.
 
 5. Apply:
 
@@ -313,7 +318,7 @@ php local/patchmanager/cli/restore.php --patch=local_zoomcustom:001-period-gradi
 php local/patchmanager/cli/status.php        # expect not_applied
 ```
 
-If no pristine backup exists for the installed version, reinstall the stock mod_zoom package; the status page will then read `not_applied`. To remove the plugins entirely, uninstall `local_zoomcustom` first — its `pre_uninstall_hook` restores the files, releases the task pause, and aborts the uninstall if it cannot.
+If no pristine backup exists for the installed version, reinstall the stock mod_zoom package; the status page will then read `not_applied`. To remove the plugins entirely, uninstall `local_zoomcustom` first — its `db/uninstall.php` handler (`xmldb_local_zoomcustom_uninstall()`) restores the files, releases the task pause, and aborts the uninstall by throwing if it cannot.
 
 ---
 
@@ -344,7 +349,7 @@ Then confirm the live path, without waiting for cron:
 ## 15. Known limitations
 
 1. **Existing inflated grades are not corrected.** Upstream only writes a grade when it is higher than the stored one (`get_meeting_reports.php:746`). Phase 1 makes future grading correct; historical correction is a separate, explicit operation. The guard log records exactly when 001 was inactive so Phase 2 can find the affected periods.
-2. **If the patch is entirely missing, the guard hunk is missing too.** The scheduled task is still paused, but the teacher "Refresh sessions" link would run upstream grading. This is unavoidable: the guard lives in the code the patch inserts.
+2. **If the patch is entirely missing, the guard hunk is missing too.** The scheduled task is still paused, and the teacher "Refresh sessions" link is covered separately by `local_zoomcustom_after_require_login()`, a plugin callback that does not depend on the patch being present. That callback blocks `mod/zoom/console/get_meeting_report.php` whenever the state is not `applied`, so the only remaining unguarded route is the one below.
 3. **`cli/get_meeting_report.php`** (the mod_zoom CLI) is deliberately not guarded — it is an explicit administrator action.
 4. **Recurring meetings** keep upstream behaviour in r1.
 5. **One node only.** Every check and apply reports its hostname. On a multi-node deployment, apply on each node or through the deployment system.
