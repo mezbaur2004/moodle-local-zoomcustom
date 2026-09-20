@@ -47,36 +47,26 @@ function local_zoomcustom_patchmanager_state_changed(array $statuses): void {
 }
 
 /**
- * Restore stock mod_zoom before this plugin is removed.
+ * Block mod_zoom's inline report console while the customisation is not active.
  *
- * Without this, uninstalling the pack would leave the inserted hooks in place
- * with nothing behind them, and upstream would quietly go back to its own
- * grading calculation.
+ * Runs after require_login() on every page, so unlike the guard that patch 001
+ * inserts into mod_zoom, it still works when the patch itself is missing,
+ * outdated or in conflict. The scheduled task being paused does not cover this
+ * path, because that script builds the task and runs it inline.
  *
+ * @param mixed $courseorid
+ * @param mixed $autologinguest
+ * @param mixed $cm
+ * @param mixed $setwantsurltome
+ * @param mixed $preventredirect
  * @return void
- * @throws moodle_exception when the patch cannot be removed
+ * @throws moodle_exception when Zoom grading must not run
  */
-function local_zoomcustom_pre_uninstall_hook(): void {
-    if (!class_exists('\local_patchmanager\api')) {
-        throw new moodle_exception('uninstallnoengine', 'local_zoomcustom');
-    }
-
-    $status = \local_patchmanager\api::get_status('local_zoomcustom', \local_zoomcustom\patches::ID);
-    if ($status === null) {
-        \local_zoomcustom\guard::release();
-        return;
-    }
-
-    if ($status->state !== \local_patchmanager\state::NOT_APPLIED) {
-        $result = \local_patchmanager\api::restore($status->definition, false, true);
-
-        $after = \local_patchmanager\api::get_status('local_zoomcustom', \local_zoomcustom\patches::ID);
-        if (!$result->success || ($after !== null && $after->state !== \local_patchmanager\state::NOT_APPLIED)) {
-            throw new moodle_exception('uninstallblocked', 'local_zoomcustom', '',
-                    implode(' ', $result->messages));
-        }
-    }
-
-    // The guard must not leave the Zoom task paused behind it.
-    \local_zoomcustom\guard::release();
+function local_zoomcustom_after_require_login($courseorid = null, $autologinguest = null, $cm = null,
+        $setwantsurltome = null, $preventredirect = null): void {
+    \local_zoomcustom\guard::protect_current_request();
 }
+
+// The uninstall handler lives in db/uninstall.php as xmldb_local_zoomcustom_uninstall().
+// Moodle has no *_pre_uninstall_hook() callback, so a function of that name here
+// would never be called.

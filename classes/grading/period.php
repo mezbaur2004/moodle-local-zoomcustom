@@ -55,28 +55,23 @@ class period {
 
         $end = $start + $duration;
 
-        // Clip every interval to the activity window, keyed the same way the
-        // upstream grading loop keys its users.
+        // Group the raw intervals per participant, keyed the same way the
+        // upstream grading loop keys its users. Clipping, merging and capping
+        // are all left to counted_duration() so there is exactly one
+        // implementation of that rule, and it is the one the tests cover.
         $intervals = [];
         foreach ($records as $record) {
             $key = self::participant_key($record);
-
-            $from = max((int) $record->join_time, $start);
-            $to = min((int) $record->leave_time, $end);
-            if ($to <= $from) {
-                // Entirely outside the window, or a zero length record.
-                if (!isset($intervals[$key])) {
-                    $intervals[$key] = [];
-                }
-                continue;
+            if (!isset($intervals[$key])) {
+                $intervals[$key] = [];
             }
 
-            $intervals[$key][] = [$from, $to];
+            $intervals[$key][] = [(int) $record->join_time, (int) $record->leave_time];
         }
 
         $durations = [];
         foreach ($intervals as $key => $list) {
-            $durations[$key] = min(self::merge_and_sum($list), $duration);
+            $durations[$key] = self::counted_duration($start, $duration, $list);
         }
 
         return (object) [

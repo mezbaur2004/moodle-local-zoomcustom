@@ -39,15 +39,22 @@ class heartbeat {
      * @return void
      */
     public static function record(string $context): void {
-        $host = gethostname();
-        $payload = json_encode([
-            'time' => time(),
-            'context' => $context,
-            'host' => $host === false ? 'unknown' : $host,
-            'revision' => patches::REVISION,
-        ]);
+        // The heartbeat is diagnostic evidence, never a precondition for
+        // grading. If recording it fails the grading run must still proceed,
+        // so nothing from here is allowed to escape into the caller.
+        try {
+            $host = gethostname();
+            $payload = json_encode([
+                'time' => time(),
+                'context' => $context,
+                'host' => $host === false ? 'unknown' : $host,
+                'revision' => patches::REVISION,
+            ]);
 
-        set_config(self::CONFIG, $payload, 'local_zoomcustom');
+            set_config(self::CONFIG, $payload, 'local_zoomcustom');
+        } catch (\Throwable $e) {
+            debugging('local_zoomcustom: could not record heartbeat: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        }
     }
 
     /**
