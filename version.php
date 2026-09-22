@@ -25,11 +25,16 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_zoomcustom';
-$plugin->version = 2026092200;
+$plugin->version = 2026092201;
 $plugin->requires = 2022112800; // Moodle 4.1.
 $plugin->maturity = MATURITY_ALPHA;
-$plugin->release = '1.1.0 (001-period-grading, 002-recurring-grading phase 1)';
+$plugin->release = '1.1.1 (001-period-grading, 002-recurring-grading phase 1)';
 $plugin->dependencies = [
-    'local_patchmanager' => 2026092000,
+    // 2026092203 (engine 1.0.7) is the first release that does not record an
+    // already-patched file as a pristine backup. This pack is the first to ship
+    // two customisations on one file, so on any earlier engine restoring either
+    // one silently leaves the other duplicated and downgraded to PARTIAL. Older
+    // engines must be refused rather than allowed to corrupt mod_zoom.
+    'local_patchmanager' => 2026092203,
     'mod_zoom' => ANY_VERSION,
 ];
