@@ -44,6 +44,15 @@ class occurrence {
     /** @var string Reconciliation found a conflicting change. Still counted, awaiting review. */
     public const FLAGGED = 'flagged';
 
+    /** @var int Default wait after an occurrence's window before trusting its data. */
+    public const DEFAULT_SETTLE_DELAY = 1800;
+
+    /** @var int Default period a settled occurrence stays open to recalculation. */
+    public const DEFAULT_RECONCILIATION_WINDOW = 259200;
+
+    /** @var int Default period to wait for any usable data before giving up. */
+    public const DEFAULT_MAX_WAIT = 604800;
+
     /**
      * @var int mod_zoom's ZOOM_RECURRINGTYPE_NOTIME.
      *
@@ -179,5 +188,222 @@ class occurrence {
         }
 
         return count($rows) . '-' . hash('sha256', implode('|', $parts));
+    }
+
+    /**
+     * How long after an occurrence's scheduled end its data is trusted.
+     *
+     * @return int seconds
+     */
+    public static function settle_delay(): int {
+        $value = get_config('local_zoomcustom', 'settledelay');
+        return $value === false || $value === '' ? self::DEFAULT_SETTLE_DELAY : (int) $value;
+    }
+
+    /**
+     * How long a settled occurrence stays open to recalculation.
+     *
+     * @return int seconds
+     */
+    public static function reconciliation_window(): int {
+        $value = get_config('local_zoomcustom', 'reconciliationwindow');
+        return $value === false || $value === '' ? self::DEFAULT_RECONCILIATION_WINDOW : (int) $value;
+    }
+
+    /**
+     * How long to wait for usable data before giving up on an occurrence.
+     *
+     * @return int seconds
+     */
+    public static function max_wait(): int {
+        $value = get_config('local_zoomcustom', 'maxwait');
+        return $value === false || $value === '' ? self::DEFAULT_MAX_WAIT : (int) $value;
+    }
+
+    /**
+     * Move every occurrence that is not yet final along its lifecycle.
+     *
+     * @param int|null $now override for tests
+     * @return array counts keyed by the transition that happened
+     */
+    public static function advance(?int $now = null): array {
+        global $DB;
+
+        $now = $now ?? time();
+        $counts = ['settled' => 0, 'final' => 0, 'expired' => 0, 'flagged' => 0, 'recalculated' => 0];
+
+        $sql = "SELECT o.*, zmd.start_time, zmd.end_time, z.duration, z.course, z.id AS zoomrecordid
+                  FROM {local_zoomcustom_occurrence} o
+                  JOIN {zoom_meeting_details} zmd ON zmd.id = o.detailsid
+                  JOIN {zoom} z ON z.id = o.zoomid
+                 WHERE o.status <> :final AND o.status <> :expired";
+
+        $rows = $DB->get_records_sql($sql, ['final' => self::FINAL, 'expired' => self::EXPIRED]);
+        if (empty($rows)) {
+            return $counts;
+        }
+
+        // One cohort lookup per activity, not per occurrence.
+        $cohorts = [];
+
+        foreach ($rows as $row) {
+            $windowend = (int) $row->start_time + (int) $row->duration;
+
+            if ($row->status === self::PENDING) {
+                $transition = self::advance_pending($row, $windowend, $now, $cohorts);
+            } else {
+                // settled or flagged: both stay open to reconciliation.
+                $transition = self::advance_settled($row, $now, $cohorts);
+            }
+
+            if ($transition !== null) {
+                $counts[$transition]++;
+            }
+        }
+
+        return $counts;
+    }
+
+    /**
+     * A pending occurrence either settles, expires, or waits.
+     *
+     * @param \stdClass $row joined occurrence row
+     * @param int $windowend occurrence start plus the activity's configured duration
+     * @param int $now
+     * @param array $cohorts per activity cache of gradeable users
+     * @return string|null the transition that happened
+     */
+    protected static function advance_pending(\stdClass $row, int $windowend, int $now, array &$cohorts): ?string {
+        $settleat = $windowend + self::settle_delay();
+
+        if ($now < $settleat) {
+            return null;
+        }
+
+        $signature = self::signature((int) $row->detailsid);
+        $hasdata = !str_starts_with($signature, '0-');
+
+        if (!$hasdata) {
+            // Nothing to calculate from. Give the report task more chances
+            // until the maximum wait runs out, then stop asking.
+            if ($now >= $windowend + self::max_wait()) {
+                self::set_status($row, self::EXPIRED, ['participantsig' => $signature]);
+                return 'expired';
+            }
+            return null;
+        }
+
+        self::recalculate($row, $signature, $cohorts);
+        self::set_status($row, self::SETTLED, [
+            'participantsig' => $signature,
+            'settledtime' => $now,
+        ]);
+
+        return 'settled';
+    }
+
+    /**
+     * A settled or flagged occurrence reconciles, flags, or finalises.
+     *
+     * @param \stdClass $row joined occurrence row
+     * @param int $now
+     * @param array $cohorts per activity cache of gradeable users
+     * @return string|null the transition that happened
+     */
+    protected static function advance_settled(\stdClass $row, int $now, array &$cohorts): ?string {
+        $signature = self::signature((int) $row->detailsid);
+
+        if ($signature !== (string) $row->participantsig) {
+            $before = attendance::cached((int) $row->id);
+            self::recalculate($row, $signature, $cohorts);
+            $after = attendance::cached((int) $row->id);
+
+            // Late data arriving is the ordinary case and needs no attention.
+            // Attendance going *down* means the new data contradicts what was
+            // already recorded, which a human should look at - so it is flagged,
+            // while keeping the recalculated values and staying counted.
+            $contradicted = false;
+            foreach ($before as $userid => $seconds) {
+                if (($after[$userid] ?? 0) < $seconds) {
+                    $contradicted = true;
+                    break;
+                }
+            }
+
+            self::set_status($row, $contradicted ? self::FLAGGED : self::SETTLED, [
+                'participantsig' => $signature,
+            ]);
+
+            return $contradicted ? 'flagged' : 'recalculated';
+        }
+
+        // A flagged occurrence waits for a person, never for the clock.
+        if ($row->status === self::FLAGGED) {
+            return null;
+        }
+
+        $settledtime = (int) ($row->settledtime ?: $now);
+        if ($now < $settledtime + self::reconciliation_window()) {
+            return null;
+        }
+
+        self::set_status($row, self::FINAL, ['finalizedtime' => $now]);
+
+        return 'final';
+    }
+
+    /**
+     * Recompute and cache the attendance of one occurrence.
+     *
+     * @param \stdClass $row joined occurrence row
+     * @param string $signature the signature the calculation is based on
+     * @param array $cohorts per activity cache of gradeable users
+     * @return void
+     */
+    protected static function recalculate(\stdClass $row, string $signature, array &$cohorts): void {
+        global $DB;
+
+        $zoomid = (int) $row->zoomid;
+        if (!array_key_exists($zoomid, $cohorts)) {
+            $zoomrecord = $DB->get_record('zoom', ['id' => $zoomid]);
+            $cohorts[$zoomid] = $zoomrecord ? users::gradeable($zoomrecord) : [];
+        }
+
+        $zoomrecord = (object) [
+            'id' => $zoomid,
+            'course' => (int) $row->course,
+            'duration' => (int) $row->duration,
+        ];
+        $details = (object) [
+            'id' => (int) $row->detailsid,
+            'start_time' => (int) $row->start_time,
+        ];
+
+        attendance::store((int) $row->id,
+                attendance::calculate($zoomrecord, $details, $cohorts[$zoomid]));
+    }
+
+    /**
+     * Write a new status and whatever timestamps go with it.
+     *
+     * @param \stdClass $row joined occurrence row, updated in place
+     * @param string $status
+     * @param array $fields extra fields to set
+     * @return void
+     */
+    protected static function set_status(\stdClass $row, string $status, array $fields = []): void {
+        global $DB;
+
+        $update = array_merge($fields, [
+            'id' => (int) $row->id,
+            'status' => $status,
+            'timemodified' => time(),
+        ]);
+
+        $DB->update_record('local_zoomcustom_occurrence', (object) $update);
+
+        foreach ($update as $name => $value) {
+            $row->{$name} = $value;
+        }
     }
 }

@@ -65,5 +65,28 @@ function xmldb_local_zoomcustom_upgrade(int $oldversion): bool {
         upgrade_plugin_savepoint(true, 2026092200, 'local', 'zoomcustom');
     }
 
+    if ($oldversion < 2026092202) {
+        $table = new xmldb_table('local_zoomcustom_attendance');
+
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('occurrenceid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('countedseconds', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+        $table->add_key('occurrenceid', XMLDB_KEY_FOREIGN, ['occurrenceid'], 'local_zoomcustom_occurrence', ['id']);
+        $table->add_key('userid', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id']);
+
+        $table->add_index('occurrenceid-userid', XMLDB_INDEX_UNIQUE, ['occurrenceid', 'userid']);
+
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        upgrade_plugin_savepoint(true, 2026092202, 'local', 'zoomcustom');
+    }
+
     return true;
 }

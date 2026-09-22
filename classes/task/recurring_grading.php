@@ -60,5 +60,12 @@ class recurring_grading extends \core\task\scheduled_task {
 
         $found = occurrence::discover();
         mtrace('local_zoomcustom: recorded ' . $found . ' new recurring occurrence(s)');
+
+        $moved = occurrence::advance();
+        mtrace('local_zoomcustom: settled ' . $moved['settled']
+                . ', recalculated ' . $moved['recalculated']
+                . ', finalised ' . $moved['final']
+                . ', flagged ' . $moved['flagged']
+                . ', expired ' . $moved['expired']);
     }
 }

@@ -59,6 +59,16 @@ $string['strictness_applied'] = 'Applied, even if not yet verified on this versi
 $string['taskguardcheck'] = 'Check the Zoom customisation guard';
 $string['taskrecurringgrading'] = 'Maintain recurring Zoom attendance grades';
 
+// Recurring grading settings.
+$string['recurringheading'] = 'Recurring attendance grading';
+$string['recurringheading_desc'] = 'How long to wait before an occurrence of a recurring meeting is trusted, and how long it stays open to correction afterwards. Zoom delivers participant reports in batches, so these exist to avoid grading a session before its attendance has finished arriving.';
+$string['settledelay'] = 'Settle delay';
+$string['settledelay_desc'] = 'How long after an occurrence\'s scheduled end to wait before calculating its attendance. Too short and a student whose report has not arrived yet is counted absent.';
+$string['reconciliationwindow'] = 'Reconciliation window';
+$string['reconciliationwindow_desc'] = 'How long a calculated occurrence stays open to recalculation if its participant data changes. Once this elapses the occurrence is final and is never recalculated automatically.';
+$string['maxwait'] = 'Maximum wait for data';
+$string['maxwait_desc'] = 'How long to keep waiting for participant data that never arrives. After this an occurrence is marked expired: it stops being retried and no longer counts towards anyone\'s grade, but stays visible for review.';
+
 // Dashboard card.
 $string['cardtitle'] = 'Zoom customisations';
 $string['cardallcurrent'] = 'All customisations are current';

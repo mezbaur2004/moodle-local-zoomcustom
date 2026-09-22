@@ -45,5 +45,24 @@ if ($hassiteconfig) {
                 \local_zoomcustom\guard::MODE_APPLIED => get_string('strictness_applied', 'local_zoomcustom'),
             ]));
 
+    $settings->add(new admin_setting_heading('local_zoomcustom/recurringheading',
+            get_string('recurringheading', 'local_zoomcustom'),
+            get_string('recurringheading_desc', 'local_zoomcustom')));
+
+    $settings->add(new admin_setting_configduration('local_zoomcustom/settledelay',
+            get_string('settledelay', 'local_zoomcustom'),
+            get_string('settledelay_desc', 'local_zoomcustom'),
+            \local_zoomcustom\recurring\occurrence::DEFAULT_SETTLE_DELAY));
+
+    $settings->add(new admin_setting_configduration('local_zoomcustom/reconciliationwindow',
+            get_string('reconciliationwindow', 'local_zoomcustom'),
+            get_string('reconciliationwindow_desc', 'local_zoomcustom'),
+            \local_zoomcustom\recurring\occurrence::DEFAULT_RECONCILIATION_WINDOW));
+
+    $settings->add(new admin_setting_configduration('local_zoomcustom/maxwait',
+            get_string('maxwait', 'local_zoomcustom'),
+            get_string('maxwait_desc', 'local_zoomcustom'),
+            \local_zoomcustom\recurring\occurrence::DEFAULT_MAX_WAIT));
+
     $ADMIN->add('localplugins', $settings);
 }
