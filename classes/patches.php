@@ -28,11 +28,24 @@ namespace local_zoomcustom;
  */
 class patches {
 
-    /** @var string Id of the period grading customisation. */
+    /**
+     * @var string Id of the period grading customisation.
+     *
+     * guard.php gates on this id alone. 002 is deliberately outside the guard:
+     * it writes only to its own grade item and cannot corrupt mod_zoom's
+     * itemnumber 0, so there is nothing for the guard to protect against, and
+     * pausing the shared report task for it would stop 001's grading too.
+     */
     public const ID = '001-period-grading';
 
-    /** @var int Revision of the definition below. Bump it whenever a hunk changes. */
+    /** @var int Revision of the 001 definition. Bump it whenever a hunk changes. */
     public const REVISION = 1;
+
+    /** @var string Id of the recurring grading customisation. */
+    public const ID_RECURRING = '002-recurring-grading';
+
+    /** @var int Revision of the 002 definition. Bump it whenever a hunk changes. */
+    public const REVISION_RECURRING = 1;
 
     /** @var string Target component. */
     public const TARGET = 'mod_zoom';
@@ -48,6 +61,7 @@ class patches {
     public static function all(): array {
         return [
             self::period_grading(),
+            self::recurring_grading(),
         ];
     }
 
@@ -92,6 +106,83 @@ class patches {
                 ],
             ],
         ];
+    }
+
+    /**
+     * 002-recurring-grading.
+     *
+     * Independent of 001: it targets a different function of the same file, so
+     * the two hunks can never overlap and may be applied in either order.
+     *
+     * The hunk is a latency nudge, not the grading path. Recurring grades are
+     * computed and written by this pack's own scheduled task, which reads only
+     * the zoom tables and writes only through gradelib. The customisation exists
+     * so a freshly ingested occurrence is picked up immediately instead of
+     * waiting for the next cron run; with it unapplied the task still produces
+     * the same grades, just later.
+     *
+     * Not marked required for that reason, and deliberately outside the guard
+     * (see the note on self::ID).
+     *
+     * @return array
+     */
+    public static function recurring_grading(): array {
+        return [
+            'contract' => 1,
+            'id' => self::ID_RECURRING,
+            'name' => get_string('patch002name', 'local_zoomcustom'),
+            'description' => get_string('patch002description', 'local_zoomcustom'),
+            'component' => self::TARGET,
+            'revision' => self::REVISION_RECURRING,
+            'required' => false,
+            'dependencies' => [],
+            'testedversions' => [self::BASELINE],
+            'baselinehashes' => [
+                'classes/task/get_meeting_reports.php'
+                    => 'f1c441d5acbf87dece0995b4f0b1629bee8b15ae7446646b25ee45c29172609e',
+            ],
+            'files' => [
+                'classes/task/get_meeting_reports.php' => [
+                    [
+                        'type' => 'insert_before',
+                        'label' => get_string('patch002hunk1', 'local_zoomcustom'),
+                        'anchor' => self::occurrence_anchor(),
+                        'payload' => self::occurrence_payload(),
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Upstream context in process_meeting_reports(), the commit that ends the
+     * transaction in which the occurrence and its participant rows were written.
+     *
+     * Anchoring here means the nudge sees data that is complete for this
+     * occurrence, and rolls back with it if the transaction fails.
+     *
+     * @return string
+     */
+    protected static function occurrence_anchor(): string {
+        return '            $transaction->allow_commit();';
+    }
+
+    /**
+     * The block inserted before that context.
+     *
+     * @return string
+     */
+    protected static function occurrence_payload(): string {
+        $block = <<<'PAYLOAD'
+            // BEGIN local_zoomcustom:002-recurring-grading r1
+            if (class_exists('\local_zoomcustom\hook')) {
+                \local_zoomcustom\hook::recurring_occurrence($zoomrecord, $detailsid);
+            }
+            // END local_zoomcustom:002-recurring-grading r1
+PAYLOAD;
+
+        // One blank line so the commit keeps its spacing.
+        return $block . "\n\n";
     }
 
     /**

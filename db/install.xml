@@ -21,5 +21,30 @@
         <INDEX NAME="timestart" UNIQUE="false" FIELDS="timestart"/>
       </INDEXES>
     </TABLE>
+    <TABLE NAME="local_zoomcustom_occurrence" COMMENT="One row per discovered occurrence of a recurring Zoom meeting, with the lifecycle state that decides whether it counts towards the recurring attendance grade.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="zoomid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="The zoom activity this occurrence belongs to."/>
+        <FIELD NAME="detailsid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="The zoom_meeting_details row for this occurrence."/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" SEQUENCE="false" COMMENT="pending, settled, final, expired or flagged."/>
+        <FIELD NAME="participantsig" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="Signature of the participant rows this occurrence was last calculated from. zoom_meeting_participants has no timemodified column, so reconciliation compares this instead. Null until first calculated."/>
+        <FIELD NAME="settledtime" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Null until the settle delay elapsed and attendance was cached."/>
+        <FIELD NAME="finalizedtime" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Null until the reconciliation window closed without a conflicting change."/>
+        <FIELD NAME="reviewedtime" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Null until an administrator resolves a flagged occurrence."/>
+        <FIELD NAME="reviewedby" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="The administrator who resolved a flagged occurrence."/>
+        <FIELD NAME="reviewnote" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Why a flagged occurrence was resolved the way it was."/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="zoomid" TYPE="foreign" FIELDS="zoomid" REFTABLE="zoom" REFFIELDS="id"/>
+        <KEY NAME="detailsid" TYPE="foreign-unique" FIELDS="detailsid" REFTABLE="zoom_meeting_details" REFFIELDS="id"/>
+        <KEY NAME="reviewedby" TYPE="foreign" FIELDS="reviewedby" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="status" UNIQUE="false" FIELDS="status"/>
+      </INDEXES>
+    </TABLE>
   </TABLES>
 </XMLDB>

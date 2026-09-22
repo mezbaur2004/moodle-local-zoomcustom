@@ -43,12 +43,18 @@ function xmldb_local_zoomcustom_uninstall(): bool {
         throw new moodle_exception('uninstallnoengine', 'local_zoomcustom');
     }
 
-    $status = \local_patchmanager\api::get_status('local_zoomcustom', \local_zoomcustom\patches::ID);
+    // Every customisation this pack registers, not just the first: a block left
+    // behind by any of them would call into a class that is about to disappear.
+    foreach ([\local_zoomcustom\patches::ID, \local_zoomcustom\patches::ID_RECURRING] as $patchid) {
+        $status = \local_patchmanager\api::get_status('local_zoomcustom', $patchid);
 
-    if ($status !== null && $status->state !== \local_patchmanager\state::NOT_APPLIED) {
+        if ($status === null || $status->state === \local_patchmanager\state::NOT_APPLIED) {
+            continue;
+        }
+
         $result = \local_patchmanager\api::restore($status->definition, false, true);
 
-        $after = \local_patchmanager\api::get_status('local_zoomcustom', \local_zoomcustom\patches::ID);
+        $after = \local_patchmanager\api::get_status('local_zoomcustom', $patchid);
         if (!$result->success || ($after !== null && $after->state !== \local_patchmanager\state::NOT_APPLIED)) {
             throw new moodle_exception('uninstallblocked', 'local_zoomcustom', '',
                     implode(' ', $result->messages));

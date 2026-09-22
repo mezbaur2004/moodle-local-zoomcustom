@@ -73,6 +73,32 @@ class hook {
     }
 
     /**
+     * Note that an occurrence of a recurring meeting has just been ingested.
+     *
+     * Called from mod_zoom\task\get_meeting_reports::process_meeting_reports()
+     * once the occurrence and its participant rows have been written, inside the
+     * transaction that commits them.
+     *
+     * Unlike period_durations(), this is not part of any grading path, so a
+     * failure here must not escape. Recurring grades are produced by this pack's
+     * own scheduled task, which rediscovers the occurrence regardless; letting an
+     * exception through would abort mod_zoom's report ingestion to save a few
+     * minutes of latency, which is a bad trade.
+     *
+     * @param \stdClass $zoomrecord row of the zoom table
+     * @param int $detailsid zoom_meeting_details.id for this occurrence
+     * @return void
+     */
+    public static function recurring_occurrence(\stdClass $zoomrecord, int $detailsid): void {
+        try {
+            recurring\occurrence::note($zoomrecord, $detailsid);
+        } catch (\Throwable $e) {
+            debugging('local_zoomcustom: could not note recurring occurrence '
+                    . $detailsid . ': ' . $e->getMessage(), DEBUG_DEVELOPER);
+        }
+    }
+
+    /**
      * Refuse to run the report/grading path while the customisation is not safe.
      *
      * Called from mod_zoom/console/get_meeting_report.php, which runs the report

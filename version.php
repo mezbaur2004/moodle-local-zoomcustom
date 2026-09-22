@@ -25,10 +25,10 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_zoomcustom';
-$plugin->version = 2026092000;
+$plugin->version = 2026092200;
 $plugin->requires = 2022112800; // Moodle 4.1.
 $plugin->maturity = MATURITY_ALPHA;
-$plugin->release = '1.0.0 (Phase 1: 001-period-grading)';
+$plugin->release = '1.1.0 (001-period-grading, 002-recurring-grading phase 1)';
 $plugin->dependencies = [
     'local_patchmanager' => 2026092000,
     'mod_zoom' => ANY_VERSION,

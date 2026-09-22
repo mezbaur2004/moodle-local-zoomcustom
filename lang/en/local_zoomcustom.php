@@ -32,6 +32,11 @@ $string['patch001description'] = 'Grades attendance against the duration configu
 $string['patch001hunk1'] = 'Replace the denominator and per user attendance in grading_participant_upon_duration()';
 $string['patch001hunk2'] = 'Apply the guard to the teacher "Refresh sessions" entry point';
 
+// Patch 002.
+$string['patch002name'] = 'Recurring attendance grading';
+$string['patch002description'] = 'Grades attendance across the occurrences of a recurring Zoom meeting, into a separate grade item of its own, so that every enrolled student gets a mark including those who never joined. The grading itself is done by this plugin\'s scheduled task; this customisation only lets a newly ingested occurrence be picked up straight away instead of at the next task run, and grades are the same either way.';
+$string['patch002hunk1'] = 'Note a newly ingested occurrence in process_meeting_reports()';
+
 // Guard.
 $string['guardok'] = 'The period grading customisation is active and verified.';
 $string['guardunverified'] = 'The period grading customisation is applied but has not been verified on the installed mod_zoom version.';
@@ -52,6 +57,7 @@ $string['strictness_applied'] = 'Applied, even if not yet verified on this versi
 
 // Task.
 $string['taskguardcheck'] = 'Check the Zoom customisation guard';
+$string['taskrecurringgrading'] = 'Maintain recurring Zoom attendance grades';
 
 // Dashboard card.
 $string['cardtitle'] = 'Zoom customisations';
