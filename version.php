@@ -25,10 +25,10 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_zoomcustom';
-$plugin->version = 2026092202;
+$plugin->version = 2026092203;
 $plugin->requires = 2022112800; // Moodle 4.1.
 $plugin->maturity = MATURITY_ALPHA;
-$plugin->release = '1.2.0 (002-recurring-grading phase 2)';
+$plugin->release = '1.2.1 (002-recurring-grading phase 2)';
 $plugin->dependencies = [
     // 2026092203 (engine 1.0.7) is the first release that does not record an
     // already-patched file as a pristine backup. This pack is the first to ship
