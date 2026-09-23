@@ -288,6 +288,11 @@ class guard {
     /**
      * Resume the upstream task, but only if this plugin paused it.
      *
+     * The flag is the only record that the pause is ours, so it is kept until
+     * the task has actually been handed back. Dropping it while the task could
+     * not be loaded would leave a pause of ours looking like an administrator's,
+     * and nothing would ever resume it.
+     *
      * @param \stdClass $result
      * @return void
      */
@@ -297,7 +302,11 @@ class guard {
         }
 
         $task = self::get_task();
-        if ($task !== null && $task->get_disabled()) {
+        if ($task === null) {
+            return;
+        }
+
+        if ($task->get_disabled()) {
             self::set_task_disabled($task, false);
         }
 
