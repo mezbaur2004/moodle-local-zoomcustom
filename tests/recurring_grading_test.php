@@ -22,7 +22,7 @@ use local_zoomcustom\recurring\occurrence;
  * Registration of 002-recurring-grading and the scope rule it grades by.
  *
  * @package    local_zoomcustom
- * @copyright  2026 Pedago Academy
+ * @copyright  2026 Mezbaur Are Rafi
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @covers     \local_zoomcustom\patches
  * @covers     \local_zoomcustom\recurring\occurrence

@@ -32,7 +32,7 @@ namespace local_zoomcustom\grading;
  * the real Zoom occurrence started late or ended early.
  *
  * @package    local_zoomcustom
- * @copyright  2026 Pedago Academy
+ * @copyright  2026 Mezbaur Are Rafi
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class period {

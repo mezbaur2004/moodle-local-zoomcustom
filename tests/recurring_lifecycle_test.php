@@ -25,7 +25,7 @@ use local_zoomcustom\recurring\users;
  * and the attendance cache.
  *
  * @package    local_zoomcustom
- * @copyright  2026 Pedago Academy
+ * @copyright  2026 Mezbaur Are Rafi
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @covers     \local_zoomcustom\recurring\occurrence
  * @covers     \local_zoomcustom\recurring\attendance

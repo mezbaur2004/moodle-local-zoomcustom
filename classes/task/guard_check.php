@@ -25,7 +25,7 @@ use local_zoomcustom\guard;
  * the protection keeps working even if the engine's own task is disabled.
  *
  * @package    local_zoomcustom
- * @copyright  2026 Pedago Academy
+ * @copyright  2026 Mezbaur Are Rafi
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class guard_check extends \core\task\scheduled_task {

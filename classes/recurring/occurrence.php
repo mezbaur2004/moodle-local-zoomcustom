@@ -24,7 +24,7 @@ namespace local_zoomcustom\recurring;
  * occurrence is noticed, not whether it is.
  *
  * @package    local_zoomcustom
- * @copyright  2026 Pedago Academy
+ * @copyright  2026 Mezbaur Are Rafi
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class occurrence {

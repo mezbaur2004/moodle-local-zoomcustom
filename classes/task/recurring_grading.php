@@ -28,7 +28,7 @@ use local_zoomcustom\recurring\occurrence;
  * occurrence is noticed.
  *
  * @package    local_zoomcustom
- * @copyright  2026 Pedago Academy
+ * @copyright  2026 Mezbaur Are Rafi
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class recurring_grading extends \core\task\scheduled_task {

@@ -28,7 +28,7 @@ namespace local_zoomcustom;
  * last_call_made_at checkpoint, within Zoom's 30 day reporting window.
  *
  * @package    local_zoomcustom
- * @copyright  2026 Pedago Academy
+ * @copyright  2026 Mezbaur Are Rafi
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class guard {

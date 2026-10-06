@@ -23,7 +23,7 @@ namespace local_zoomcustom\privacy;
  * own customisation was inactive. It stores no personal data of its own.
  *
  * @package    local_zoomcustom
- * @copyright  2026 Pedago Academy
+ * @copyright  2026 Mezbaur Are Rafi
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class provider implements \core_privacy\local\metadata\null_provider {
